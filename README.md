@@ -1,4 +1,4 @@
-# PHYS 121 - Pre-Lab #1
+# UBC Okanagan PHYS 121 - Pre-Lab #1
 
 ## Learning Objectives:
 * <b><span style="color:rgba(0, 153, 76, 1);">Determine what *does* and *does not* affect the width of a distribution of measurements.</span></b>
