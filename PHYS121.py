@@ -8,6 +8,7 @@ Created on Tue May 24 21:19:19 2022
 # Import some required modules.
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 from matplotlib.pyplot import cm # used to generate a sequence of colours for plotting
 from scipy.optimize import curve_fit
 from IPython.display import HTML as html_print
@@ -1287,3 +1288,43 @@ def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True):
                 plt.quiver(x_E, y_E, ExSub, EySub, scale = Sc, scale_units = 'inches', width = 0.0035, color = 'k')
 
     return fig
+
+###############################################################################
+# Generate a sequence of random integers and then find their product          #
+# - modified 20230109                                                         #
+###############################################################################       
+# Check to see if ipysheet is installed.
+def printDigits():
+    # This randomly choses how many digits the generated number should be
+    numDigits = random.randint(25, 35)
+    
+    # Now we generate a list of random integers numDigits long
+    digits = list(np.random.randint(1, 9, numDigits))
+    
+    # Next, we take their product
+    product = 1
+    for n in digits:
+        product = product * float(n)
+        
+    # Print the results
+    print(f"Number of digits: {numDigits}\nList of digits: {digits}\nProduct: {int(product)}")
+    return
+    
+###############################################################################
+# Determine which digit generated from a product of integers was set to zero  #
+# - modified 20230109                                                         #
+###############################################################################       
+# Find the digit that was set to zero.
+def chase(Number):
+    length = len(Number) # Determine the length of Number.  Number is a string.
+    if Number[0] == '0':
+        Number = Number[1:length] # If Number has a leading zero, remove it
+    Number = int(Number) # Convert Number into an integer
+    while Number >= 10:
+        charList = list(str(Number)) # split numbers into individual string digits
+        Number = 0
+        for i in charList: # Sum the digits
+            Number += int(i)
+    if Number != 9: # Find the suppressed digit
+        Number = 9 - Number
+    return Number
