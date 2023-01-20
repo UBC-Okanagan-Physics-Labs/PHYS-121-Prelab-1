@@ -83,7 +83,7 @@ def install_and_import(package):
 ###############################################################################
 # Check to see if required packages are already installed.                    #
 # If not, then install them.                                                  #
-# - modified 20221206                                                         #
+# - modified 20230119                                                         #
 ############################################################################### 
 # Start the 'Check' function.
 def Installer():
@@ -96,7 +96,7 @@ def Installer():
         spec = importlib.util.find_spec(name)
         if spec is None:
             display(html_print(cstr('Installing some packages ...\n', color = 'red')))
-            display(html_print(cstr("After the installation completes, please run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
+            display(html_print(cstr("After the installation completes, please restart the kernel and then run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--user', name])
             cnt += 1
 
@@ -105,7 +105,7 @@ def Installer():
         importlib.import_module('otter')
     except ImportError:
         display(html_print(cstr('Installing some packages ...\n', color = 'red')))
-        display(html_print(cstr("After the installation completes, please run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
+        display(html_print(cstr("After the installation completes, please restart the kernel and then run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
         import pip
         pip.main(['install', 'otter-grader'])
         cnt += 1
@@ -115,7 +115,7 @@ def Installer():
     if cnt == 0:
         display(html_print(cstr('All packages already installed. Please proceed.', color = 'black')))
     else:
-        display(html_print(cstr("\n Some packages were installed.  Please run the 'PHYS121.Installer()' function again before proceeding.", color = 'red')))
+        display(html_print(cstr("\n Some packages were installed.  Please restart the kernel and then run the 'PHYS121.Installer()' function again before proceeding.", color = 'red')))
         
 
 ###############################################################################
