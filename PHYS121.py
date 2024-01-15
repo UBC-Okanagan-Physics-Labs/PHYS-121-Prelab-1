@@ -7,8 +7,11 @@ Created on Tue May 24 21:19:19 2022
 
 # Import some required modules.
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import random
+import os
+import hashlib
 from matplotlib.pyplot import cm # used to generate a sequence of colours for plotting
 from scipy.optimize import curve_fit
 from IPython.display import HTML as html_print
@@ -96,7 +99,7 @@ def Installer():
         spec = importlib.util.find_spec(name)
         if spec is None:
             display(html_print(cstr('Installing some packages ...\n', color = 'red')))
-            display(html_print(cstr("After the installation completes, please restart the kernel and then run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
+            display(html_print(cstr("After the installation completes, please run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--user', name])
             cnt += 1
 
@@ -105,7 +108,7 @@ def Installer():
         importlib.import_module('otter')
     except ImportError:
         display(html_print(cstr('Installing some packages ...\n', color = 'red')))
-        display(html_print(cstr("After the installation completes, please restart the kernel and then run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
+        display(html_print(cstr("After the installation completes, please run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
         import pip
         pip.main(['install', 'otter-grader'])
         cnt += 1
@@ -115,7 +118,7 @@ def Installer():
     if cnt == 0:
         display(html_print(cstr('All packages already installed. Please proceed.', color = 'black')))
     else:
-        display(html_print(cstr("\n Some packages were installed.  Please restart the kernel and then run the 'PHYS121.Installer()' function again before proceeding.", color = 'red')))
+        display(html_print(cstr("\n Some packages were installed.  Please run the 'PHYS121.Installer()' function again before proceeding.", color = 'red')))
         
 
 ###############################################################################
@@ -171,6 +174,13 @@ def eParse(num, places):
 # Start the 'Scatter' function.
 def Scatter(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', yUnits = '', fill = False, show = True):
     fig = ''
+    # Check to see if the elements of dataArray are numpy arrays.  If they are, convert to lists
+    if  type(xData).__module__ == np.__name__:
+        xData = xData.tolist()
+    if  type(yData).__module__ == np.__name__:
+        yData = yData.tolist()
+    if  type(yErrors).__module__ == np.__name__:
+        yErrors = yErrors.tolist()
     # Check that the lengths of the inputs are all the same.  Check that the other inputs are strings.
     if len(xData) != len(yData) and xData != []:
         display(html_print(cstr('The length of xData (' + str(len(xData)) + ') is not equal to the length of yData (' + str(len(yData)) + ').', color = 'magenta')))
@@ -199,7 +209,7 @@ def Scatter(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', xU
     else:
         fig = plt.figure(figsize=(5, 5), dpi=100) # create a square figure.
         ax = fig.add_subplot(111)
-        if xData == []:
+        if len(xData) == 0:
             xData = np.arange(1, len(yData) + 1, 1)
             xlabel = 'trial number'
             xUnits = ''
@@ -272,7 +282,7 @@ def MultiScatter(DataArray, xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', y
             if len(DataArray[i]) != 2 and len(DataArray[i]) != 3:
                 display(html_print(cstr("The elements of 'DataArray' must be lists of length 2 or 3.  Element " + str(i + 1) + ' does not satisfy this requirement.', color = 'magenta')))
                 return fig
-            elif all(isinstance(x, list) or type(x).__module__ == np.__name__ for x in DataArray[i]) != True: # Is dataArray a list of lists or arrays?
+            elif all(isinstance(x, (list, pd.core.series.Series)) or type(x).__module__ == np.__name__ for x in DataArray[i]) != True: # Is dataArray a list of lists or arrays
                 display(html_print(cstr("The elements of 'DataArray' must be a list of lists.  Element " +  str(i + 1) + ' does not satisfy this requirement.', color = 'magenta')))
                 return fig
             elif len(DataArray[i]) == 2:
@@ -289,7 +299,7 @@ def MultiScatter(DataArray, xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', y
             if type(DataArray[i]).__module__ == np.__name__:
                 DataArray[i] = DataArray[i].tolist()
             for j in range(len(DataArray[i])):
-                if type(DataArray[i][j]).__module__ == np.__name__:
+                if type(DataArray[i][j]).__module__ == np.__name__ or isinstance(DataArray[i][j], pd.core.series.Series):
                     DataArray[i][j] = DataArray[i][j].tolist()
         # Convert DataArray to a single master list
         masterList = sum(sum(DataArray,[]),[])
@@ -444,7 +454,7 @@ def LinearFit(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', 
         
 ###############################################################################
 # Weighted & Unweighted Power Law Fits                                        #
-# - modified 20220705                                                         #
+# - modified 20230221                                                         #
 ############################################################################### 
 # Start the 'PowerLaw' function.
 def PowerLaw(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', yUnits = ''):
@@ -494,6 +504,9 @@ def PowerLaw(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', x
             y = coeff*x**power + offset
             return y
         
+        # Find the minimum y value.  Will scale yData by the minimum value of y so that the nonlinear fit doesn't fail or require good initial guesses at the parameter values.
+        ymax = np.max(yData)
+
         # If the yErrors list is empty, do an unweighted fit.  Otherwise, do a weighted fit.
         print('')
         if xUnits == '':
@@ -501,18 +514,18 @@ def PowerLaw(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', x
         else:
             display(Markdown('$y = A\,(x/1$ ' + xUnits + '$)^N\,+ \,C$'))
         if len(yErrors) == 0: 
-            a_fit, cov = curve_fit(PowerFunc, xData, yData)
+            a_fit, cov = curve_fit(PowerFunc, xData, yData/ymax)
             display(Markdown('This is an **UNWEIGHTED** fit.'))
         else:
-            a_fit, cov = curve_fit(PowerFunc, xData, yData, sigma = yErrors)
+            a_fit, cov = curve_fit(PowerFunc, xData, yData/ymax, sigma = yErrors/ymax)
             display(Markdown('This is a **WEIGHTED** fit.'))
 
-        Coeff = a_fit[0]
-        errCoeff = np.sqrt(np.diag(cov))[0]
+        Coeff = a_fit[0]*ymax
+        errCoeff = np.sqrt(np.diag(cov))[0]*ymax
         Power = a_fit[1]
         errPower = np.sqrt(np.diag(cov))[1]
-        Offset = a_fit[2]
-        errOffset = np.sqrt(np.diag(cov))[2]
+        Offset = a_fit[2]*ymax
+        errOffset = np.sqrt(np.diag(cov))[2]*ymax
 
         # Use the 'uncertainties' package to format the best-fit parameters and the corresponding uncertainties.
         A = uncertainties.ufloat(Coeff, errCoeff)
@@ -578,9 +591,9 @@ def PowerLaw(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', x
 # Start the 'Charging' function.
 def Charging(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', yUnits = ''):
     # Check to see if the elements of dataArray are numpy arrays.  If they are, convert to lists
-    V0_fit = ''
+    A_fit = ''
     tau_fit = ''
-    errV0 = ''
+    errA = ''
     errTau = ''
     fig = ''
     if  type(xData).__module__ == np.__name__:
@@ -617,28 +630,28 @@ def Charging(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', x
         import uncertainties
 
         # Define the linear function used for the fit.
-        def ChargingFcn(x, V0, tau):
-            y = V0*(1 - np.exp(-x/tau))
+        def ChargingFcn(x, A, tau):
+            y = A*(1 - np.exp(-x/tau))
             return y
         
         # If the yErrors list is empty, do an unweighted fit.  Otherwise, do a weighted fit.
         print('')
-        display(Markdown('$y = V_0(1 - e^{-x/ \\tau})$'))
+        display(Markdown('$y = A(1 - e^{-x/ \\tau})$'))
     
         if len(yErrors) == 0: 
-            a_fit, cov = curve_fit(ChargingFcn, xData, yData)
+            a_fit, cov = curve_fit(ChargingFcn, np.array(xData)/max(xData), np.array(yData)/max(yData))
             display(Markdown('This is an **UNWEIGHTED** fit.'))
         else:
-            a_fit, cov = curve_fit(ChargingFcn, xData, yData, sigma = yErrors)
+            a_fit, cov = curve_fit(ChargingFcn, np.array(xData)/max(xData), np.array(yData)/max(yData), sigma = yErrors)
             display(Markdown('This is a **WEIGHTED** fit.'))
 
-        V0_fit = a_fit[0]
-        errV0 = np.sqrt(np.diag(cov))[0]
-        tau_fit = a_fit[1]
-        errTau = np.sqrt(np.diag(cov))[1]
+        A_fit = a_fit[0]*max(yData)
+        errA = np.sqrt(np.diag(cov))[0]*max(yData)
+        tau_fit = a_fit[1]*max(xData)
+        errTau = np.sqrt(np.diag(cov))[1]*max(xData)
         
         # Use the 'uncertainties' package to format the best-fit parameters and the corresponding uncertainties.
-        V0 = uncertainties.ufloat(V0_fit, errV0)
+        A = uncertainties.ufloat(A_fit, errA)
         tau = uncertainties.ufloat(tau_fit, errTau)
 
         # Make a formatted table that reports the best-fit parameters and their uncertainties        
@@ -647,16 +660,16 @@ def Charging(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', x
 #            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits + '/' + xUnits + eval(r'"\u00b' + str(Power) + '"')},
 #                       'power':{'':'$N =$', 'Value': '{:0.2ug}'.format(N), 'Units': ''},
 #                       'offset':{'':'$C =$', 'Value': '{:0.2ug}'.format(C), 'Units': yUnits}}
-            my_dict = {'equilibrium voltage' :{'':'$V_0 =$', 'Value': '{:0.2ug}'.format(V0), 'Units': yUnits},
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
                        'time constant':{'':'$\tau =$', 'Value': '{:0.2ug}'.format(tau), 'Units': xUnits}}
         elif xUnits != '' and yUnits == '':
-            my_dict = {'equilibrium voltage' :{'':'$V_0 =$', 'Value': '{:0.2ug}'.format(V0), 'Units': yUnits},
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
                        'time constant':{'':'$\tau =$', 'Value': '{:0.2ug}'.format(tau), 'Units': xUnits}}       
         elif xUnits == '' and yUnits != '':
-            my_dict = {'equilibrium voltage' :{'':'$V_0 =$', 'Value': '{:0.2ug}'.format(V0), 'Units': yUnits},
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
                        'time constant':{'':'$\tau =$', 'Value': '{:0.2ug}'.format(tau), 'Units': xUnits}}
         else:
-            my_dict = {'equilibrium voltage' :{'':'$V_0 =$', 'Value': '{:0.2ug}'.format(V0)},
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A)},
                        'time constant':{'':'$\tau =$', 'Value': '{:0.2ug}'.format(tau)}}
 
         # Display the table
@@ -681,12 +694,146 @@ def Charging(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', x
 
         # Plot the best-fit line...
         xx = np.arange(xmin, xmax, (xmax-xmin)/5000)
-        plt.plot(xx, V0_fit*(1 - np.exp(-xx/tau_fit)), 'k-')
+        plt.plot(xx, A_fit*(1 - np.exp(-xx/tau_fit)), 'k-')
 
         # Show the final plot.
         plt.show()
-    return V0_fit, tau_fit, errV0, errTau, fig
-    
+    return A_fit, tau_fit, errA, errTau, fig
+
+###############################################################################
+# Weighted & Unweighted Sine                                                  #
+# - modified 20230320                                                         #
+############################################################################### 
+# Start the 'Sine' function.
+def Sine(xData, yData, yErrors = [], xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', yUnits = ''):
+    # Check to see if the elements of dataArray are numpy arrays.  If they are, convert to lists
+    Coeff = ''
+    Power = ''
+    Offset = ''
+    errCoeff = ''
+    errPower = ''
+    errOffset = ''
+    fig = ''
+    if  type(xData).__module__ == np.__name__:
+        xData = xData.tolist()
+    if  type(yData).__module__ == np.__name__:
+        yData = yData.tolist()
+    if  type(yErrors).__module__ == np.__name__:
+        yErrors = yErrors.tolist()
+    # Check that the lengths of the inputs are all the same.  Check that the other inputs are strings.
+    if len(xData) != len(yData):
+        display(html_print(cstr('The length of xData (' + str(len(xData)) + ') is not equal to the length of yData (' + str(len(yData)) + ').', color = 'magenta')))
+    elif len(yErrors) != 0 and len(xData) != len(yErrors):  
+        display(html_print(cstr('The length of xData (' + str(len(xData)) + ') is not equal to the length of yErrors (' + str(len(yErrors)) + ').', color = 'magenta')))
+    elif len(yErrors) != 0 and len(yData) != len(yErrors):  
+        display(html_print(cstr('The length of yData (' + str(len(yData)) + ') is not equal to the length of yErrors (' + str(len(yErrors)) + ').', color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in xData) != True:
+        display(html_print(cstr("The elements of 'xData' must be integers or floats.", color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in yData) != True:
+        display(html_print(cstr("The elements of 'yData' must be integers or floats.", color = 'magenta')))
+    elif len(yErrors) != 0 and all(isinstance(x, (int, float)) for x in yErrors) != True:
+        display(html_print(cstr("The elements of 'yErrors' must be integers or floats.", color = 'magenta')))
+    elif isinstance(xlabel, str) == False:
+        display(html_print(cstr("'xlabel' must be a string.", color = 'magenta')))
+    elif isinstance(ylabel, str) == False:
+        display(html_print(cstr("'ylabel' must be a string.", color = 'magenta')))
+    elif isinstance(xUnits, str) == False:
+        display(html_print(cstr("'xUnits' must be a string.", color = 'magenta')))
+    elif isinstance(yUnits, str) == False:
+        display(html_print(cstr("'yUnits' must be a string.", color = 'magenta')))
+    else:
+        # Uncertainties is a nice package that can be used to properly round
+        # a numerical value based on its associated uncertainty.
+        install_and_import('uncertainties') # check to see if uncertainties is installed.  If it isn't attempt to do the install
+        import uncertainties
+
+        # Define the linear function used for the fit.
+        def SineFcn(x, coeff, period, phase):
+            y = coeff*np.sin(2*np.pi/period*x + phase)
+            return y
+        
+        # Find the minimum y value.  Will scale yData by the minimum value of y so that the nonlinear fit doesn't fail or require good initial guesses at the parameter values.
+        ymax = np.max(yData)
+        T_Est = 1.41 #  period in s.
+
+        start = (ymax, T_Est, 0)
+
+
+        # If the yErrors list is empty, do an unweighted fit.  Otherwise, do a weighted fit.
+        print('')
+        if xUnits == '':
+            display(Markdown('$y = A\,\sin(2\pi/T x + \phi)$'))
+        else:
+            display(Markdown('$y = A\,\sin(2\pi/T x + \phi)$'))
+        if len(yErrors) == 0: 
+            a_fit, cov = curve_fit(SineFcn, xData, yData, p0 = start)
+            display(Markdown('This is an **UNWEIGHTED** fit.'))
+        else:
+            a_fit, cov = curve_fit(SineFcn, xData, yData, sigma = yErrors, p0 = start)
+            display(Markdown('This is a **WEIGHTED** fit.'))
+
+        coeff = a_fit[0]
+        errCoeff = np.sqrt(np.diag(cov))[0]
+        period = a_fit[1]
+        errPeriod = np.sqrt(np.diag(cov))[1]
+        phase = a_fit[2]
+        errPhase = np.sqrt(np.diag(cov))[2]
+
+        # Use the 'uncertainties' package to format the best-fit parameters and the corresponding uncertainties.
+        A = uncertainties.ufloat(coeff, errCoeff)
+        T = uncertainties.ufloat(period, errPeriod)
+        phi = uncertainties.ufloat(phase, errPhase)
+
+        # Make a formatted table that reports the best-fit parameters and their uncertainties        
+        import pandas as pd
+        if xUnits != '' and yUnits != '':
+#            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits + '/' + xUnits + eval(r'"\u00b' + str(Power) + '"')},
+#                       'period':{'':'$T =$', 'Value': '{:0.2ug}'.format(T), 'Units': xUnits},
+#                       'phase':{'':'$\phi =$', 'Value': '{:0.2ug}'.format(phi), 'Units': 'rad'}}
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
+                       'period':{'':'$T =$', 'Value': '{:0.2ug}'.format(T), 'Units': xUnits},
+                       'phase':{'':'$\phi =$', 'Value': '{:0.2ug}'.format(phi), 'Units': 'rad'}}
+        elif xUnits != '' and yUnits == '':
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
+                       'period':{'':'$T =$', 'Value': '{:0.2ug}'.format(T), 'Units': xUnits},
+                       'phase':{'':'$\phi =$', 'Value': '{:0.2ug}'.format(phi), 'Units': 'rad'}}           
+        elif xUnits == '' and yUnits != '':
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
+                       'period':{'':'$T =$', 'Value': '{:0.2ug}'.format(T), 'Units': xUnits},
+                       'phase':{'':'$\phi =$', 'Value': '{:0.2ug}'.format(phi), 'Units': 'rad'}} 
+        else:
+            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A)},
+                       'period':{'':'$T =$', 'Value': '{:0.2ug}'.format(T)},
+                       'phase':{'':'$\phi =$', 'Value': '{:0.2ug}'.format(phi)}} 
+
+        # Display the table
+        df = pd.DataFrame(my_dict)
+        display(df.transpose())
+        
+        # Generate the best-fit line. 
+        #fitFcn = np.polynomial.Polynomial(a_fit)
+        
+        # Call the Scatter function to create a scatter plot.
+        fig = Scatter(xData, yData, yErrors, xlabel, ylabel, xUnits, yUnits, False, False)
+        
+        # Determine the x-range.  Used to determine the x-values needed to produce the best-fit line.
+        if np.min(xData) > 0:
+            xmin = 0.9*np.min(xData)
+        else:
+            xmin = 1.1*np.min(xData)
+        if np.max(xData) > 0:
+            xmax = 1.1*np.max(xData)
+        else:
+            xmax = 0.9*np.max(xData)
+
+        # Plot the best-fit line...
+        xx = np.arange(xmin, xmax, (xmax-xmin)/5000)
+        plt.plot(xx, coeff*np.sin(2*np.pi/period*xx + phase), 'k-')
+
+        # Show the final plot.
+        plt.show()
+    return coeff, period, phase, errCoeff, errPeriod, errPhase, fig
+
 
 ###############################################################################
 # Magnetic Braking Nonlinear Fits                                             #
@@ -1040,10 +1187,10 @@ def HistOverlap(dataArray, nbins = 10, xlabel = 'x-axis', xUnits = '',  normaliz
 
 ###############################################################################
 # Import Image & Add a Caption                                                #
-# - modified 20220711                                                         #
+# - modified 20230205                                                         #
 ###############################################################################        
 # Start the 'Import Image' function.
-def ImportImage(filename, caption = '', size = 5, rotation = 0):
+def ImportImage(filename, caption = '', rotation = 0):
     from os.path import exists as file_exists
     fig = ''
     if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.eps')) == False:
@@ -1058,14 +1205,14 @@ def ImportImage(filename, caption = '', size = 5, rotation = 0):
         display(html_print(cstr('The rotational angle must be a float or integer.  It represents the rotation angle in degrees.', color = 'magenta')))
     else:
         from PIL import Image
-        fig = plt.figure(figsize=(size, size), dpi=100) # create a square figure.
+        fig = plt.figure(figsize=(12, 8), dpi=100) # create a square figure.
         img = Image.open(filename) # Open the file
         img = img.rotate(rotation, expand = 1) # Rotate the file.
         plt.imshow(img)
         plt.axis('off') # Remove the axes from the 'plot'.
-        plt.text(0, 4300,'%s' %caption, size = 14, color = "k") # Add the caption below the image.
+        plt.text(0, 0,'%s' %caption, size = 14, color = "k") # Add the caption below the image.
         plt.show() # Show the image.
-    return fig
+    return
     
     
 ###############################################################################
@@ -1086,10 +1233,10 @@ def Spreadsheet(csvName):
 
 ###############################################################################
 # Produce contour and vector field plots                                      #
-# - modified 20220816                                                         #
+# - modified 20230205                                                         #
 ###############################################################################       
 # Check to see if ipysheet is installed.
-def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True):
+def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True, fig_file_name = 'figure.png'):
     
     import matplotlib.pyplot as plt
     import scipy.interpolate
@@ -1115,6 +1262,8 @@ def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True):
         display(html_print(cstr("The elements of 'potential' must be integers or floats.", color = 'magenta')))
     elif isinstance(graphNum, int) == False:
         display(html_print(cstr("'graphNum' must be an integer from 1 to 7 corresponding to the graph number on your board.", color = 'magenta')))
+    elif isinstance(fig_file_name, str) == False:
+        display(html_print(cstr("'fig_file_name' must be a string.", color = 'magenta')))
     else:
         
         x = x_coord
@@ -1286,8 +1435,9 @@ def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True):
         
                 # Plot the electric field vectors.
                 plt.quiver(x_E, y_E, ExSub, EySub, scale = Sc, scale_units = 'inches', width = 0.0035, color = 'k')
+                plt.savefig(fig_file_name, format='png')
 
-    return fig
+    return
 
 ###############################################################################
 # Generate a sequence of random integers and then find their product          #
@@ -1299,7 +1449,13 @@ def printDigits():
     numDigits = random.randint(25, 35)
     
     # Now we generate a list of random integers numDigits long
-    digits = list(np.random.randint(1, 9, numDigits))
+    test = False
+    while test == False:
+        digits = list(np.random.randint(1, 10, numDigits))
+        seen = set()
+        duplicates = list(set(x for x in digits if x in seen or seen.add(x)))
+        if 9 in digits or (3 in digits and 6 in digits) or 3 in duplicates or 6 in duplicates:
+            test = True
     
     # Next, we take their product
     product = 1
@@ -1328,3 +1484,25 @@ def chase(Number):
     if Number != 9: # Find the suppressed digit
         Number = 9 - Number
     return Number
+
+
+###############################################################################
+# Change the extension of a string representing the name of a file            #
+# - modified 20230205                                                         #
+###############################################################################       
+def extension(file_names_in, new_ext):
+    file_names_out = []
+    for f in file_names_in:
+        file_name, file_extension = os.path.splitext(f)
+        file_names_out.append(file_name + "." + new_ext)
+    return file_names_in + file_names_out
+
+
+###############################################################################
+# Hash student answers so that the Otter-Grader grader.check() output         #
+# doesn't reveal the correct answer                                           #
+# - modified 20230310                                                         #
+###############################################################################       
+def get_hash(num):
+    """Helper function for assessing correctness"""
+    return hashlib.md5(str(num).encode()).hexdigest()
