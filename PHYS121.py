@@ -15,7 +15,10 @@ import hashlib
 from matplotlib.pyplot import cm # used to generate a sequence of colours for plotting
 from scipy.optimize import curve_fit
 from IPython.display import HTML as html_print
-from IPython.display import display, Markdown, Latex
+from IPython.display import display, Markdown, Latex, clear_output
+from datetime import datetime, timedelta
+import sympy as sym
+import inspect
 
 ###############################################################################
 # Import a set of modules                                                     #
@@ -86,7 +89,7 @@ def install_and_import(package):
 ###############################################################################
 # Check to see if required packages are already installed.                    #
 # If not, then install them.                                                  #
-# - modified 20230119                                                         #
+# - modified 20240624                                                         #
 ############################################################################### 
 # Start the 'Check' function.
 def Installer():
@@ -99,7 +102,7 @@ def Installer():
         spec = importlib.util.find_spec(name)
         if spec is None:
             display(html_print(cstr('Installing some packages ...\n', color = 'red')))
-            display(html_print(cstr("After the installation completes, please run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
+            display(html_print(cstr("After the installation completes, please restart the kernel and then run the 'PHYS231.Installer()' function again before proceeding.\n", color = 'red')))
             subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--user', name])
             cnt += 1
 
@@ -108,9 +111,10 @@ def Installer():
         importlib.import_module('otter')
     except ImportError:
         display(html_print(cstr('Installing some packages ...\n', color = 'red')))
-        display(html_print(cstr("After the installation completes, please run the 'PHYS121.Installer()' function again before proceeding.\n", color = 'red')))
+        display(html_print(cstr("After the installation completes, please restart the kernel and then run the 'PHYS231.Installer()' function again before proceeding.\n", color = 'red')))
         import pip
-        pip.main(['install', 'otter-grader'])
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--user', 'otter-grader'])
+        #pip.main(['install', 'otter-grader'])
         cnt += 1
     finally:
         globals()['otter'] = importlib.import_module('otter')
@@ -118,7 +122,7 @@ def Installer():
     if cnt == 0:
         display(html_print(cstr('All packages already installed. Please proceed.', color = 'black')))
     else:
-        display(html_print(cstr("\n Some packages were installed.  Please run the 'PHYS121.Installer()' function again before proceeding.", color = 'red')))
+        display(html_print(cstr("\n Some packages were installed.  Please restart the kernel and then run the 'PHYS231.Installer()' function again before proceeding.", color = 'red')))
         
 
 ###############################################################################
@@ -1506,3 +1510,579 @@ def extension(file_names_in, new_ext):
 def get_hash(num):
     """Helper function for assessing correctness"""
     return hashlib.md5(str(num).encode()).hexdigest()
+
+###############################################################################
+# Hash student answers so that the Otter-Grader grader.check() output         #
+# doesn't reveal the correct answer                                           #
+# - modified 20240221                                                         #
+###############################################################################       
+def hasher(num):
+    if num == 'a':
+        hashcode = '0cc175b9c0f1b6a831c399e269772661'
+    elif num == 'b':
+        hashcode = '92eb5ffee6ae2fec3ad71c777531578f'
+    elif num == 'c':
+        hashcode = '4a8a08f09d37b73795649038408b5f33'
+    elif num == 'd':
+        hashcode = '8277e0910d750195b448797616e091ad'
+    elif num == 'e':
+        hashcode = 'e1671797c52e15f763380b45e841ec32'
+    elif num == 'f':
+        hashcode = '8fa14cdd754f91cc6554c9e71929cce7'
+    elif num == 'g':
+        hashcode = 'b2f5ff47436671b6e533d8dc3614845d'
+    elif num == 'h':
+        hashcode = '2510c39011c5be704182423e3a695e91'
+    elif num == 'i':
+        hashcode = '865c0c0b4ab0e063e5caa3387c1a8741'
+    elif num == 'j':
+        hashcode = '363b122c528f54df4a0446b6bab05515'
+    elif num == 'k':
+        hashcode = '8ce4b16b22b58894aa86c421e8759df3'
+    elif num == 'l':
+        hashcode = '2db95e8e1a9267b7a1188556b2013b33'
+    elif num == 'm':
+        hashcode = '6f8f57715090da2632453988d9a1501b'
+    elif num == 'n':
+        hashcode = '7b8b965ad4bca0e41ab51de7b31363a1'
+    elif num == 'o':
+        hashcode = 'd95679752134a2d9eb61dbd7b91c4bcc'
+    elif num == 'p':
+        hashcode = '83878c91171338902e0fe0fb97a8c47a'
+    elif num == 'q':
+        hashcode = '7694f4a66316e53c8cdd9d9954bd611d'
+    elif num == 'r':
+        hashcode = '4b43b0aee35624cd95b910189b3dc231'
+    elif num == 's':
+        hashcode = '03c7c0ace395d80182db07ae2c30f034'
+    elif num == 't':
+        hashcode = 'e358efa489f58062f10dd7316b65649e'
+    elif num == 'u':
+        hashcode = '7b774effe4a349c6dd82ad4f4f21d34c'
+    elif num == 'v':
+        hashcode = '9e3669d19b675bd57058fd4664205d2a'
+    elif num == 'w':
+        hashcode = 'f1290186a5d0b1ceab27f4e77c0c5d68'
+    elif num == 'x':
+        hashcode = '9dd4e461268c8034f5c8564e155c67a6'
+    elif num == 'y':
+        hashcode = '415290769594460e2e485922904f345d'
+    elif num == 'z':
+        hashcode = 'fbade9e36a3f36d3d676c1b808451dd7'
+    return hashcode
+
+
+###############################################################################
+# Log student entries to auto-graded questions                                #
+# - modified 20240120                                                         #
+###############################################################################       
+def dataLogger(questionStr, x, varNames, log):
+    if os.path.isfile('PHYS121_DataLogger.txt') == False:
+        with open('PHYS121_DataLogger.txt', 'a+') as f:
+            f.write('Date' + '\t' + 'Time' + '\t' + 'Question' + '\t' + 'Variable Name' + '\t' + 'Response' + '\t' + 'Type' + '\t' + 'Result' + '\n')
+    now = datetime.now()
+    corr = now - timedelta(hours = 8)
+
+    testString = log.lower().replace('\n','').replace(' ', '').replace('name_and_student_number_1', '')
+    results = []
+    for k in x:
+        results = results + ['passed']
+    if 'failed' in testString: 
+        splitList = testString.split('failed')
+        for j in range(len(varNames)):
+            for i in range(1, len(splitList), 2):
+                if varNames[j] in splitList[i]:
+                    results[j] = 'failed'
+    cnt = 0
+    for xi in x:
+        with open('PHYS121_DataLogger.txt', 'a+') as f:
+            if isinstance(xi, sym.Expr):
+                objectType = 'symbolic'
+            elif isinstance(xi, bool):
+                objectType = 'boolean'
+            elif isinstance(xi, str):
+                objectType = 'string'
+            elif isinstance(xi, int):
+                objectType = 'integer'
+            elif isinstance(xi, float):
+                objectType = 'float'
+            elif isinstance(xi, complex):
+                objectType = 'complex'
+            elif isinstance(xi, list):
+                objectType = 'list'
+            elif isinstance(xi, np.ndarray):
+                objectType = 'numpy array'
+            elif isinstance(xi, pd.DataFrame):
+                objectType = 'pandas dataframe'
+            elif isinstance(xi, tuple):
+                objectType = 'tuple'
+            elif isinstance(xi, set):
+                objectType = 'set'
+            elif isinstance(xi, np.ndarray) == False and isinstance(xi, list) == False and isinstance(xi, pd.DataFrame) == False and isinstance(xi, tuple) == False and isinstance(xi, set) == False and xi == ...:
+                objectType = 'ellipsis'
+            else:
+                objectType = 'unknown'
+            
+            dt_string = corr.strftime("%d/%m/%Y" + '\t' + "%H:%M:%S")
+            f.write(dt_string + '\t' + questionStr + '\t' + varNames[cnt] + '\t' + str(xi).replace('\n','') + '\t' + objectType + '\t' + results[cnt] + '\n')
+            cnt += 1
+    return
+
+###############################################################################
+# Log student entries to auto-graded questions                                #
+# - modified 20240120                                                         #
+###############################################################################       
+def graderCheck(x, varNames, check):
+    questionStr = str(check).split(' results')[0] # Get a string of the question name.
+    dataLogger(questionStr, x, varNames, str(check))
+    return check
+
+
+###############################################################################
+# For printing outputs in colour (copied from Stack Overflow)                 #
+# - modified 20220607                                                         #
+############################################################################### 
+# Start the 'cstr' function.
+def cstr2(s, color = 'black'):
+    return "<b><text style=color:{}>{}</text></b>".format(color, s)
+
+def saveMessage():
+    print("\n"), display(Markdown('<img src="https://raw.githubusercontent.com/UBC-Okanagan-Physics-Labs/PHYS-121-images/main/general/gifs/save.gif" width="80">'))
+    display(html_print(cstr2("STOP! Save your work before execting the next code cell.\n", color = 'red')))
+    
+def waitMessage():
+    display(Markdown('<img src="https://raw.githubusercontent.com/UBC-Okanagan-Physics-Labs/PHYS-121-images/main/general/gifs/siren.gif" width="80">'))
+    display(html_print(cstr2("Do NOT download your .zip submission yet!", color = 'red')))
+    display(html_print(cstr2("Please wait for the .zip file to be created and populated with all the necessary files.", color = 'red')))
+    display(html_print(cstr2("A second message will appear when it is okay to proceed.", color = 'red')))
+    display(html_print(cstr2("Failure to follow these instructions may result in a corrupt submission and a grade of zero.", color = 'red')))
+    display(html_print(cstr2("----------------------------------------------------------------------------", color = 'red')))
+    
+def proceedMessage():
+    import glob
+    from zipfile import ZipFile
+
+    path = os.getcwd()
+    files = glob.glob('*.zip') 
+
+    for x in files:
+        try:
+            the_zip_file = ZipFile(x)
+            ret = the_zip_file.testzip()
+            file_list = the_zip_file.namelist()
+            display(html_print(cstr2("----------------------------------------------------------------------------", color = 'blue')))
+            display(Markdown('<img src="https://raw.githubusercontent.com/UBC-Okanagan-Physics-Labs/PHYS-121-images/main/general/gifs/trafficlight.gif" width="200">'))
+            display(html_print(cstr2("Success!  Please proceed with the download.\n", color = 'blue')))
+            print("\nThe files contained in", x, "are:\n")
+            print('\n'.join(file_list))
+        except:
+            print("It looks like there's an issue with:", x)
+            
+            
+            
+###############################################################################
+# Function for generating an animated plot of a simple pendulum               #
+# - modified 20240619                                                         #
+###############################################################################            
+def AnimatedPlot(L, theta0, thetaList, tList, tmax):
+    
+    filename = 'xkcd.txt'
+    lines = open(filename).read().splitlines()
+    c1 = random.choice(lines)
+    c2 = random.choice(lines)
+    c3 = random.choice(lines)
+    
+    x = 0
+    step = 1375
+    t = tList[x]
+
+    xBob = []
+    yBob = []
+    tt = []
+    while t <= tmax - step*(tList[1] - tList[0]):
+        xx = L*np.sin(thetaList[x])
+        yy = -L*np.cos(thetaList[x])
+        xBob = xBob + [xx]
+        yBob = yBob + [yy]
+
+        t = tList[x]
+        tt = tt + [t]
+        x = x + step
+
+    fig = plt.figure(figsize=(15,9))
+    ax1 = fig.add_subplot(2, 2, 1) 
+    ax2 = fig.add_subplot(2, 2, 2)
+    ax3 = fig.add_subplot(2, 2, 3)
+    
+    #ax1.patch.set_facecolor('xkcd:' + c1)
+    #ax1.patch.set_alpha(0.1)
+    ax1.plot([0], [0], 'x', color = 'pink', markerfacecolor = "None")
+    ax1.text(0.05 , 0, 'rotation axis', fontsize = 10)
+    delta = 0.045
+    t = ax1.text(L*np.sin(theta0) + delta , -L*np.cos(theta0) + delta, r'$\theta_0 = $' + str(round(theta0*180/np.pi)) + r'$^\circ$', fontsize = 10)
+    t.set_bbox(dict(facecolor = 'white', alpha = 1, edgecolor = 'white')) # Put a solid white background behind the theta0 textbox.
+    ax1.set_xlim(-L, L)
+    ax1.set_ylim(-1.1*L, 0.1*L)
+    ax1.set_aspect('equal')
+    ax1.xaxis.set_label_position("top")
+    ax1.set_xlabel('x position')
+    ax1.set_ylabel('y position')
+    
+    ax2.patch.set_facecolor('xkcd:' + c2)
+    ax2.patch.set_alpha(0.1)
+    ax2.plot([0, tmax], [0, 0], '--', color = 'lightgrey')
+    ax2.text(0.25 , -0.065, r'$y = 0$', fontsize = 10)
+    ax2.plot([0, tmax], [-L, -L], '--', color = 'lightgrey')
+    ax2.text(0.25 , -1.065, r'$y = -L$', fontsize = 10)
+    ax2.set_xlim(0, tmax)
+    ax2.set_ylim(-1.1*L, 0.1*L)
+    ax2.set_xlabel('time')
+    ax2.yaxis.set_label_position("right")
+    ax2.set_ylabel('y position', rotation = 270, labelpad = 15)
+    
+    ax3.patch.set_facecolor('xkcd:' + c3)
+    ax3.patch.set_alpha(0.1)
+    ax3.plot([0, 0], [0, tmax], '--', color = 'lightgrey')
+    ax3.set_xlim(-L, L)
+    ax3.set_ylim(tmax, 0)
+    ax3.set_xlabel('x position')
+    ax3.set_ylabel('time')
+
+    i = 0
+    t = tt[i]
+    while t <= tmax - step*(tList[1] - tList[0]):
+        #ax1.cla()
+        if i != 0:
+            ax1.plot([0, xBob[i - 1]], [0, yBob[i - 1]], 'white', linewidth = 3)
+            ax1.plot([xBob[i - 1]], [yBob[i - 1]], 'o', color = 'lightgrey')
+        ax1.plot(xBob[i], yBob[i], 'ko')
+        ax1.plot([0, xBob[i]], [0, yBob[i]], 'k', linewidth = 1)
+        
+        ax2.plot(tt[i], yBob[i], 'o', color = 'blue', markerfacecolor = "None")
+        ax2.plot(tt[i - 1:i + 1], yBob[i - 1:i + 1], '-', color = 'blue', alpha = 0.35, markerfacecolor = "None")
+
+        ax3.plot(xBob[i - 1:i + 1], tt[i - 1:i + 1], '-', color = 'red', alpha = 0.35, markerfacecolor = "None")
+        ax3.plot(xBob[i], tt[i], 'o', color = 'red', markerfacecolor = "None")
+
+        display(fig)
+
+        i = i + 1
+        t = tt[i]
+
+        clear_output(wait = True)
+
+
+###############################################################################
+# Simulation of a simple pendulum                                             #
+# - modified 20240620                                                         #
+############################################################################### 
+def PendulumSim(alpha0):
+    # 1. Set loop parameters (number of iterations, maximum time, and the time step).
+    steps = int(1e5)
+    tmax = 10 # s 
+    dt = tmax/steps # Set the value of dt
+    
+    alpha0 = np.deg2rad(alpha0)
+    
+    ell = 1 # m.
+    g = 9.81 # m/s^2. 
+
+    # 4. Calculate the approximate period in units of seconds when using the small-angle approximation
+    Tapprox = 2*np.pi*np.sqrt(ell/g) 
+
+    # 2. Put the initial parameters inside lists.
+    t = [0]
+    alpha = [alpha0]
+    v_alpha = [0]
+    a_alpha = [-(g/ell)*np.sin(alpha0)]
+
+    # 3. Set up a Python loop to iteratively calculate the quantities listed in Table 1.
+    # Note that in Python, only the indented lines that follow the "for" statement are inside the loop.
+    for i in range(steps): 
+        # Update the time and append to the time list
+        t.append(t[i] + dt)
+
+        # Update the angular acceleration and append to the list
+        a_alpha.append(-(g/ell)*np.sin(alpha[i]))
+
+        # Update the angular velocity and append to the list
+        v_alpha.append(v_alpha[i] + a_alpha[i]*dt)
+
+        # Update the angular position and append to the list
+        alpha.append(alpha[i] + v_alpha[i]*dt)
+
+    # 4. Plot the angular position as a function of time
+    plt.plot(t, np.rad2deg(alpha))
+    plt.plot([0, tmax], [0, 0], ':', color = 'lightgrey')
+    plt.xlabel('time (s)')
+    plt.ylabel('angular position (degrees)')
+    plt.xlim(0, tmax);
+
+    # 5. Determine the oscillation period.
+    i = 0
+    while not (v_alpha[i] <= 0 and v_alpha[i + 1] > 0):
+        i = i + 1
+
+    # 6. Compare the numerically-calculated period to the period found using the small-angle approximation.
+    T = 2*t[i]
+    display(Latex(r'$T = $ ' + '{0:.3f}'.format(T) + ' s'))
+    display(Latex(r'$T_\mathrm{approx} = $ ' + '{0:.3f}'.format(Tapprox) + ' s'))
+
+
+
+
+###############################################################################
+# Weighted & Unweighted Lorentzian Fits                                       #
+# - modified 20221014                                                         #
+############################################################################### 
+# Start the 'Lorentz' function.
+def Lorentz(xData, yData, yErrors = [], start = [1, 220, 50], xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', yUnits = ''):
+    # Check to see if the elements of dataArray are numpy arrays.  If they are, convert to lists
+    A_fit = ''
+    w0_fit = ''
+    gamma_fit = ''
+    errA = ''
+    errw0 = ''
+    errgamma = ''
+    fig = ''
+    if  type(xData).__module__ == np.__name__:
+        xData = xData.tolist()
+    if  type(yData).__module__ == np.__name__:
+        yData = yData.tolist()
+    if  type(yErrors).__module__ == np.__name__:
+        yErrors = yErrors.tolist()
+    if  type(start).__module__ == np.__name__:
+        start = start.tolist()
+    # Check that the lengths of the inputs are all the same.  Check that the other inputs are strings.
+    if len(start) != 3:
+        display(html_print(cstr('The length of start (' + str(len(start)) + ') must be equal to 3.', color = 'magenta')))
+    if len(xData) != len(yData):
+        display(html_print(cstr('The length of xData (' + str(len(xData)) + ') is not equal to the length of yData (' + str(len(yData)) + ').', color = 'magenta')))
+    elif len(yErrors) != 0 and len(xData) != len(yErrors):  
+        display(html_print(cstr('The length of xData (' + str(len(xData)) + ') is not equal to the length of yErrors (' + str(len(yErrors)) + ').', color = 'magenta')))
+    elif len(yErrors) != 0 and len(yData) != len(yErrors):  
+        display(html_print(cstr('The length of yData (' + str(len(yData)) + ') is not equal to the length of yErrors (' + str(len(yErrors)) + ').', color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in xData) != True:
+        display(html_print(cstr("The elements of 'xData' must be integers or floats.", color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in yData) != True:
+        display(html_print(cstr("The elements of 'yData' must be integers or floats.", color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in start) != True:
+        display(html_print(cstr("The elements of 'start' must be integers or floats.", color = 'magenta')))
+    elif len(yErrors) != 0 and all(isinstance(x, (int, float)) for x in yErrors) != True:
+        display(html_print(cstr("The elements of 'yErrors' must be integers or floats.", color = 'magenta')))
+    elif isinstance(xlabel, str) == False:
+        display(html_print(cstr("'xlabel' must be a string.", color = 'magenta')))
+    elif isinstance(ylabel, str) == False:
+        display(html_print(cstr("'ylabel' must be a string.", color = 'magenta')))
+    elif isinstance(xUnits, str) == False:
+        display(html_print(cstr("'xUnits' must be a string.", color = 'magenta')))
+    elif isinstance(yUnits, str) == False:
+        display(html_print(cstr("'yUnits' must be a string.", color = 'magenta')))
+    else:
+        # Uncertainties is a nice package that can be used to properly round
+        # a numerical value based on its associated uncertainty.
+        install_and_import('uncertainties') # check to see if uncertainties is installed.  If it isn't attempt to do the install
+        import uncertainties
+
+        # Define the linear function used for the fit.
+        def LorentzFcn(x, A, w0, gamma):
+            y = A/np.sqrt(1 + (x/gamma)**2*(1 - (w0/x)**2)**2)
+            return y
+        
+        # If the yErrors list is empty, do an unweighted fit.  Otherwise, do a weighted fit.
+        print('')
+        display(Markdown(r'$y = \dfrac{A}{\sqrt{1 + \left(\dfrac{\omega}{\gamma}\right)^2\left[1 - \left(\dfrac{\omega_0}{\omega}\right)^2\right]^2}}$'))
+    
+        if len(yErrors) == 0: 
+            a_fit, cov = curve_fit(LorentzFcn, xData, yData, p0 = start)
+            display(Markdown('This is an **UNWEIGHTED** fit.'))
+        else:
+            a_fit, cov = curve_fit(LorentzFcn, xData, yData, sigma = yErrors, p0 = start, absolute_sigma = True)
+            display(Markdown('This is a **WEIGHTED** fit.'))
+
+        A_fit = a_fit[0]
+        errA = np.sqrt(np.diag(cov))[0]
+        w0_fit = a_fit[1]
+        errw0 = np.sqrt(np.diag(cov))[1]
+        gamma_fit = a_fit[2]
+        errgamma = np.sqrt(np.diag(cov))[2]
+        
+        # Use the 'uncertainties' package to format the best-fit parameters and the corresponding uncertainties.
+        A = uncertainties.ufloat(A_fit, errA)
+        w0 = uncertainties.ufloat(w0_fit, errw0)
+        gamma = uncertainties.ufloat(gamma_fit, errgamma)
+
+        # Make a formatted table that reports the best-fit parameters and their uncertainties        
+        import pandas as pd
+        if xUnits != '' and yUnits != '':
+#            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits + '/' + xUnits + eval(r'"\u00b' + str(Power) + '"')},
+#                       'power':{'':'$N =$', 'Value': '{:0.2ug}'.format(N), 'Units': ''},
+#                       'offset':{'':'$C =$', 'Value': '{:0.2ug}'.format(C), 'Units': yUnits}}
+            my_dict = {'amplitude' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
+                       'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0), 'Units': xUnits},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma), 'Units': xUnits}}
+        elif xUnits != '' and yUnits == '':
+            my_dict = my_dict = {'amplitude' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
+                       'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0), 'Units': xUnits},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma), 'Units': xUnits}}
+        elif xUnits == '' and yUnits != '':
+            my_dict = my_dict = {'amplitude' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits},
+                       'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0), 'Units': xUnits},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma), 'Units': xUnits}}
+        else:
+            my_dict = my_dict = {'amplitude' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A)},
+                       'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0)},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma)}}
+
+        # Display the table
+        df = pd.DataFrame(my_dict)
+        display(df.transpose())
+        
+        # Generate the best-fit line. 
+        #fitFcn = np.polynomial.Polynomial(a_fit)
+        
+        # Call the Scatter function to create a scatter plot.
+        fig = Scatter(xData, yData, yErrors, xlabel, ylabel, xUnits, yUnits, False, False)
+        
+        # Determine the x-range.  Used to determine the x-values needed to produce the best-fit line.
+        if np.min(xData) > 0:
+            xmin = 0.9*np.min(xData)
+        else:
+            xmin = 1.1*np.min(xData)
+        if np.max(xData) > 0:
+            xmax = 1.1*np.max(xData)
+        else:
+            xmax = 0.9*np.max(xData)
+
+        # Plot the best-fit line...
+        xx = np.arange(xmin, xmax, (xmax-xmin)/5000)
+
+        plt.plot(xx, A_fit/np.sqrt(1 + (xx/gamma_fit)**2*(1 - (w0_fit/xx)**2)**2), 'k-')
+
+        # Show the final plot.
+        plt.show()
+    return A_fit, w0_fit, gamma_fit, errA, errw0, errgamma, fig
+
+
+###############################################################################
+# Weighted & Unweighted Lorentzian Phase Fits                                 #
+# - modified 20221014                                                         #
+############################################################################### 
+# Start the 'Lorentz' function.
+def Phase(xData, yData, yErrors = [], start = [220, 50], xlabel = 'x-axis', ylabel = 'y-axis', xUnits = '', yUnits = ''):
+    # Check to see if the elements of dataArray are numpy arrays.  If they are, convert to lists
+    w0_fit = ''
+    gamma_fit = ''
+    errw0 = ''
+    errgamma = ''
+    fig = ''
+    if  type(xData).__module__ == np.__name__:
+        xData = xData.tolist()
+    if  type(yData).__module__ == np.__name__:
+        yData = yData.tolist()
+    if  type(yErrors).__module__ == np.__name__:
+        yErrors = yErrors.tolist()
+    if  type(start).__module__ == np.__name__:
+        start = start.tolist()   
+    # Check that the lengths of the inputs are all the same.  Check that the other inputs are strings.
+    if len(start) != 2:
+        display(html_print(cstr('The length of start (' + str(len(start)) + ') must be equal to 2', color = 'magenta')))
+    if len(xData) != len(yData):
+        display(html_print(cstr('The length of xData (' + str(len(xData)) + ') is not equal to the length of yData (' + str(len(yData)) + ').', color = 'magenta')))
+    elif len(yErrors) != 0 and len(xData) != len(yErrors):  
+        display(html_print(cstr('The length of xData (' + str(len(xData)) + ') is not equal to the length of yErrors (' + str(len(yErrors)) + ').', color = 'magenta')))
+    elif len(yErrors) != 0 and len(yData) != len(yErrors):  
+        display(html_print(cstr('The length of yData (' + str(len(yData)) + ') is not equal to the length of yErrors (' + str(len(yErrors)) + ').', color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in xData) != True:
+        display(html_print(cstr("The elements of 'xData' must be integers or floats.", color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in yData) != True:
+        display(html_print(cstr("The elements of 'yData' must be integers or floats.", color = 'magenta')))
+    elif all(isinstance(x, (int, float)) for x in start) != True:
+        display(html_print(cstr("The elements of 'start' must be integers or floats.", color = 'magenta')))
+    elif len(yErrors) != 0 and all(isinstance(x, (int, float)) for x in yErrors) != True:
+        display(html_print(cstr("The elements of 'yErrors' must be integers or floats.", color = 'magenta')))
+    elif isinstance(xlabel, str) == False:
+        display(html_print(cstr("'xlabel' must be a string.", color = 'magenta')))
+    elif isinstance(ylabel, str) == False:
+        display(html_print(cstr("'ylabel' must be a string.", color = 'magenta')))
+    elif isinstance(xUnits, str) == False:
+        display(html_print(cstr("'xUnits' must be a string.", color = 'magenta')))
+    elif isinstance(yUnits, str) == False:
+        display(html_print(cstr("'yUnits' must be a string.", color = 'magenta')))
+    else:
+        # Uncertainties is a nice package that can be used to properly round
+        # a numerical value based on its associated uncertainty.
+        install_and_import('uncertainties') # check to see if uncertainties is installed.  If it isn't attempt to do the install
+        import uncertainties
+
+        # Define the linear function used for the fit.
+        def LorentzFcn(x, w0, gamma):
+            y = np.arctan((x/gamma)*(1 - (w0/x)**2))
+            return y
+        
+        # If the yErrors list is empty, do an unweighted fit.  Otherwise, do a weighted fit.
+        print('')
+        display(Markdown(r'$y = \arctan\left\{\dfrac{\omega}{\gamma}\left[1 - \left(\dfrac{\omega_0}{\omega}\right)^2\right]\right\}$'))
+    
+        if len(yErrors) == 0: 
+            a_fit, cov = curve_fit(LorentzFcn, xData, yData, p0 = start)
+            display(Markdown('This is an **UNWEIGHTED** fit.'))
+        else:
+            a_fit, cov = curve_fit(LorentzFcn, xData, yData, sigma = yErrors, p0 = start, absolute_sigma = True)
+            display(Markdown('This is a **WEIGHTED** fit.'))
+
+        w0_fit = a_fit[0]
+        errw0 = np.sqrt(np.diag(cov))[0]
+        gamma_fit = a_fit[1]
+        errgamma = np.sqrt(np.diag(cov))[1]
+        
+        # Use the 'uncertainties' package to format the best-fit parameters and the corresponding uncertainties.
+        w0 = uncertainties.ufloat(w0_fit, errw0)
+        gamma = uncertainties.ufloat(gamma_fit, errgamma)
+
+        # Make a formatted table that reports the best-fit parameters and their uncertainties        
+        import pandas as pd
+        if xUnits != '' and yUnits != '':
+#            my_dict = {'coefficient' :{'':'$A =$', 'Value': '{:0.2ug}'.format(A), 'Units': yUnits + '/' + xUnits + eval(r'"\u00b' + str(Power) + '"')},
+#                       'power':{'':'$N =$', 'Value': '{:0.2ug}'.format(N), 'Units': ''},
+#                       'offset':{'':'$C =$', 'Value': '{:0.2ug}'.format(C), 'Units': yUnits}}
+            my_dict = {'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0), 'Units': xUnits},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma), 'Units': xUnits}}
+        elif xUnits != '' and yUnits == '':
+            my_dict = my_dict = {'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0), 'Units': xUnits},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma), 'Units': xUnits}}
+        elif xUnits == '' and yUnits != '':
+            my_dict = my_dict = {'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0), 'Units': xUnits},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma), 'Units': xUnits}}
+        else:
+            my_dict = my_dict = {'angular resonance freuqnecy' :{'':'$\omega_0 =$', 'Value': '{:0.2ug}'.format(w0)},
+                       'width' :{'':'$\gamma =$', 'Value': '{:0.2ug}'.format(gamma)}}
+
+        # Display the table
+        df = pd.DataFrame(my_dict)
+        display(df.transpose())
+        
+        # Generate the best-fit line. 
+        #fitFcn = np.polynomial.Polynomial(a_fit)
+        
+        # Call the Scatter function to create a scatter plot.
+        fig = Scatter(xData, yData, yErrors, xlabel, ylabel, xUnits, yUnits, False, False)
+        
+        # Determine the x-range.  Used to determine the x-values needed to produce the best-fit line.
+        if np.min(xData) > 0:
+            xmin = 0.9*np.min(xData)
+        else:
+            xmin = 1.1*np.min(xData)
+        if np.max(xData) > 0:
+            xmax = 1.1*np.max(xData)
+        else:
+            xmax = 0.9*np.max(xData)
+
+        # Plot the best-fit line...
+        xx = np.arange(xmin, xmax, (xmax-xmin)/5000)
+
+        plt.plot(xx, np.arctan((xx/gamma_fit)*(1 - (w0_fit/xx)**2)), 'k-')
+
+        # Show the final plot.
+        plt.show()
+    return w0_fit, gamma_fit, errw0, errgamma, fig
