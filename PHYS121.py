@@ -1447,7 +1447,6 @@ def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True, fig_f
 # Generate a sequence of random integers and then find their product          #
 # - modified 20230109                                                         #
 ###############################################################################       
-# Check to see if ipysheet is installed.
 def printDigits():
     # This randomly choses how many digits the generated number should be
     numDigits = random.randint(25, 35)
@@ -1463,12 +1462,15 @@ def printDigits():
     
     # Next, we take their product
     product = 1
+    digList = []
     for n in digits:
-        product = product * float(n)
+        product = product * int(n)
+        digList += [int(n)]
         
     # Print the results
-    print(f"Number of digits: {numDigits}\nList of digits: {digits}\nProduct: {int(product)}")
+    print(f"Number of digits: {int(numDigits)}\nList of digits: {digList}\nProduct: {int(product)}")
     return
+
     
 ###############################################################################
 # Determine which digit generated from a product of integers was set to zero  #
