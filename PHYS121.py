@@ -1302,15 +1302,18 @@ def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True, fig_f
         
             # The interpolated data follows a grid and is sorted.  Now do a second interpolation that does include exprapolation.
             # The extrapolation will fill the plot from zero to 25 in the x direction and from zero to 20 in the y direction.
-            xx, yy = np.meshgrid(xi, yi)
-            Z = np.zeros(np.shape(xx))
+            #xx, yy = np.meshgrid(xi, yi)
+            #Z = np.zeros(np.shape(xx))
 
-            f = interpolate.interp2d(xi, yi, zi, kind='cubic')
-
+            #f = interpolate.interp2d(xi, yi, zi, kind='cubic') -- interp2d is deprecated
+            f = scipy.interpolate.RectBivariateSpline(yi, xi, zi) # Replaced 20250130
+            
             xnew = np.arange(0, 25.025, 0.025)
-            ynew = np.arange(0, 20.025, 0.025)
-            znew = f(xnew, ynew)
-
+            ynew = np.arange(0, 20.02, 0.02)
+            
+            Xnew, Ynew = np.meshgrid(xnew, ynew)
+            Znew = f(ynew, xnew)
+            
             if graphNum == 6:
                 btm = -1
             else:
@@ -1319,9 +1322,9 @@ def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True, fig_f
             # Generate the contour plot.
             fig = plt.figure(figsize=(12, 8), dpi=100)
             ax = fig.add_subplot(111)
-            plt.contourf(xnew, ynew, znew, levels = np.arange(btm, 11, 0.1), cmap='RdYlBu_r');
+            plt.contourf(Xnew, Ynew, Znew, levels = np.arange(btm, 11, 0.1), cmap='RdYlBu_r');
             plt.colorbar(ticks = np.linspace(0, 10, 11))
-            CS = plt.contour(xnew, ynew, znew, levels = np.arange(btm, 11, 0.5), colors = 'dimgray', linewidths = 0.5);
+            CS = plt.contour(Xnew, Ynew, Znew, levels = np.arange(btm, 11, 0.5), colors = 'dimgray', linewidths = 0.5);
             # ax.clabel(CS, CS.levels, inline=True, fontsize=10)
             plt.axis((0, 25, 0, 20))
             plt.xlabel('x (cm)')
@@ -1410,9 +1413,9 @@ def Mapping(x_coord, y_coord, potential, graphNum = 0, vectorField = True, fig_f
 
             if vectorField == True:
                 # Calculate the electric field at all the points in the interpolated/extrapolated potential.
-                xEle, yEle = np.mgrid[0:25.025:0.025, 0:20.025:0.025]
-                zEle = np.transpose(znew)
-                Ex, Ey = np.gradient(zEle, 0.025, 0.025)
+                xEle, yEle = np.mgrid[0:25.025:0.025, 0:20.02:0.02]
+                zEle = np.transpose(Znew)
+                Ex, Ey = np.gradient(zEle, 0.025, 0.02)
                 Ex = -Ex
                 Ey = -Ey
 
@@ -1470,7 +1473,6 @@ def printDigits():
     # Print the results
     print(f"Number of digits: {int(numDigits)}\nList of digits: {digList}\nProduct: {int(product)}")
     return
-
     
 ###############################################################################
 # Determine which digit generated from a product of integers was set to zero  #
@@ -2088,3 +2090,52 @@ def Phase(xData, yData, yErrors = [], start = [220, 50], xlabel = 'x-axis', ylab
         # Show the final plot.
         plt.show()
     return w0_fit, gamma_fit, errw0, errgamma, fig
+
+
+
+
+
+###############################################################################
+# Report the time since last notebook save                                    #                                
+# - modified 20260115                                                         #
+############################################################################### 
+def save_time():
+    import time, pathlib, datetime
+
+    cwd = pathlib.Path().resolve()
+    ipynbs = list(cwd.glob("*.ipynb"))
+
+    lines = []
+    lines.append(f"Kernel working directory: {cwd}")
+    lines.append(
+        f"Log generated at: "
+        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+
+    if not ipynbs:
+        lines.append("⚠️ No notebook file found in this folder.")
+    else:
+        latest = max(ipynbs, key=lambda p: p.stat().st_mtime)
+        age = time.time() - latest.stat().st_mtime
+        mtime = datetime.datetime.fromtimestamp(
+            latest.stat().st_mtime
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
+        lines.append(f"🕒 Time since last notebook save: {age:.1f} seconds")
+        lines.append(f"📓 Most recently saved notebook: {latest.name}")
+        lines.append(f"📅 That notebook's last-modified time: {mtime}")
+
+        if age > 10:
+            lines.append("")
+            lines.append(
+                "⚠️ If you made any changes since the last save, "
+                "please save the notebook (Ctrl/Cmd-S) and then rerun this export cell."
+            )
+
+    text = "\n".join(lines) + "\n"
+
+    # Print for the student
+    print(text)
+
+    # Write for grading/auditing
+    (cwd / "save_time.txt").write_text(text, encoding="utf-8")
